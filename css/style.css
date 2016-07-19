@@ -1,0 +1,97 @@
+ @media print {
+    .myDivToPrint {
+        background-color: white;
+        height: 100%;
+        width: 100%;
+        position: fixed;
+        top: 0;
+        left: 0;
+        margin: 0;
+        padding: 15px;
+        font-size: 14px;
+        line-height: 18px;
+    }
+}
+             .ontop {
+                z-index: 999;
+                width: 100%;
+                height: 100%;
+                top: 0;
+                left: 0;
+                display: none;
+                position: absolute;             
+                color: #aaaaaa;
+            }
+            #popup {
+                width: 1500px;
+                height: 800px;
+                position: absolute;
+                color: #ffff;
+                /* To align popup window at the center of screen*/
+                top: 20%;
+                left: 20%;
+                margin-top: -100px;
+                margin-left: -150px;
+            }
+            .inputbx{
+                width: 100%;padding: 5px 10px;
+            }
+            .tableHead{
+                padding:5px;
+                text-align: center
+            }
+            .normal-font1{
+                padding:20px 10px;}/*
+            }/onClick="pop('popDiv')"*/
+            .input-style{
+                text-align:center;
+                padding: 5px;
+                width: 50%;
+            }
+            #formId{
+                margin-top: 30%;
+                background:#fff;
+                opacity: 0.9;
+                padding: 30px 20px;
+            }
+            #AddformId{
+                background:#fff;
+                opacity: 0.9;
+                padding: 30px 20px;
+            }
+            .heading{
+                font-size: 30px;
+                font-weight: 700;
+            }
+            .button-style{
+                background:none;
+                padding:5px 20px;
+
+                font-weight: 700;
+            }
+            .button-style:hover{
+                background:#0095FF;
+                color:#fff;
+                text-decoration:none!important;
+               
+            }
+            #selected{
+                padding:5px 20px;
+                color:#000;
+                width: 100%;
+            }
+            table {
+                font-family: arial, sans-serif;
+                border-collapse: collapse;
+                width: 100%;
+                }
+
+             td, th {
+                border: 1px solid #dddddd;
+                text-align: left;
+                padding: 8px;
+            }
+
+             tr:nth-child(even) {
+                background-color: #dddddd;
+            } 
