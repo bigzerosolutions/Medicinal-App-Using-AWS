@@ -1,0 +1,562 @@
+
+<HTML>
+	<HEAD>
+		<TITLE>Medical Billing Application</TITLE>
+		<link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+		 <link rel="stylesheet" type="text/css" href="css/style.css">
+         <script src="js/jquery.min.js"></script>
+         <script src="js/aws-sdk.min.js"></script>
+        <script type="text/javascript">
+            var selecteddata = [{Id:"",Name:"",qty:"",amount:""}];
+            function createDBConnection()
+            {
+                AWS.config.update({accessKeyId: 'AKIAIRY3TUHMX7WZKSNA', secretAccessKey: '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'});
+                // Configure the region
+                AWS.config.region = 'us-west-2';  //us-west-2 is Oregon
+                //create the ddb object
+                var ddb = new AWS.DynamoDB();
+
+                return ddb;
+            }
+            function login() 
+            {
+                var un = document.frm.username.value;
+                var pw = document.frm.password.value;
+                var ddb = createDBConnection();
+                var readparams = 
+                {  
+                    Key: 
+                    {
+                      username: {S: un}
+                    },
+                    AttributesToGet: ['password'],
+                    TableName: 'login'
+                };
+
+                ddb.getItem(readparams, function(err, data) 
+                {
+                    if (err) 
+                    {
+                        alert("Login failed, Could not connect to DynamoDB"); 
+                        return false;
+                    }
+                    else 
+                    {
+                        if( data.Item.password.S == pw)
+                        {
+                            //getContacts();
+                            pop('popDiv');
+                        }
+                        else
+                        {
+                            alert('Login failed, invalid credentials');
+                            return false;
+                        }
+                    }
+                });
+            }
+            
+            function getDetails() 
+            {
+                var value = document.getElementById("selected").value;
+                if(value=='')
+                {
+                    alert("Please select any Medicine");
+                }
+                else
+                {
+                    var ddb = createDBConnection();
+                    var readparams = 
+                    {  
+                        TableName: 'product',
+                        //Select: 'ALL_ATTRIBUTES'
+                        AttributesToGet:['id','Name', 'Desc', 'Stock']
+                    };
+
+                    ddb.scan(readparams, function(err, data) 
+                    {
+                        if (err) 
+                        {
+                            alert("Could not connect to DynamoDB" + err); 
+                            return false;
+                        }
+                        else 
+                        {
+                            for(i=0;i<data.Count;i++)
+                            {
+                                if(data.Items[i].Name.S == value)
+                                {
+                                    var qty =1;
+                                    var qty =document.getElementById("itemQty").value;
+                                    var amount =data.Items[i].Stock.N
+                                    var cost =qty*amount;
+                                    
+                                    selecteddata.push({Id:data.Items[i].id.N,Name:data.Items[i].Name.S,qty:qty,amount:cost});
+                                    loadTable(selecteddata);
+                                    
+                                }
+                                
+                            }
+                        }
+                    });
+                }
+            }
+            function loadTable(selecteddata)
+            {
+                if(selecteddata.length==1)
+                {
+                var totalCost = 0;
+                var table = document.getElementById("MedSelected");
+                table.innerHTML = "";
+                var row;
+                row = table.insertRow(0);
+                row.insertCell(0).innerHTML= 'ID';
+                row.insertCell(1).innerHTML= 'Name';
+                row.insertCell(2).innerHTML= 'Quantity';
+                row.insertCell(3).innerHTML= 'Rate';
+
+                for(i=1;i<selecteddata.length;i++)
+                {
+                    row = table.insertRow(table.getElementsByTagName("tr").length);
+                    row.insertCell(0).innerHTML= selecteddata[i].Id;
+                    row.insertCell(1).innerHTML= selecteddata[i].Name;
+                    row.insertCell(2).innerHTML=selecteddata[i].qty;
+                    row.insertCell(3).innerHTML=selecteddata[i].amount;
+                    var cost = parseInt(selecteddata[i].amount);
+                    totalCost = totalCost + cost;
+                    document.getElementById("amountTotal").value=totalCost;
+                    saveToSales(selecteddata[i]);
+                    }
+                }      
+            }
+           function getMedineRecord()
+            {
+                var ddb = createDBConnection();
+                var params = 
+                {
+                    TableName: 'product',
+                    //Select: 'ALL_ATTRIBUTES'
+                    AttributesToGet:['Name']
+                };
+
+                ddb.scan(params, function(err, data) 
+                {
+                    if (err) 
+                    {
+                        alert("Unable to add item. Error JSON:", JSON.stringify(err, null, 2)); 
+                        return false;
+                    }
+                    else 
+                    {
+                        //var item = data.Item.name;
+                        var x = document.getElementById("selected");
+                        var option = document.createElement("option");
+                        option.text = "";
+                        x.add(option);
+                        var array = [];
+                        for(i=0;i<data.Count;i++)
+                        {
+                            array.push(data.Items[i].Name.S);
+                        }
+                        var testArray = uniq(array);
+                        for(i=0;i<testArray.length;i++)
+                        {
+                            option = document.createElement("option");
+                            option.text = testArray[i];
+                            x.add(option);
+                        }
+                        /*for(i=0;i<array.length;i++)
+                        {
+                            count=0;
+                            for(j=0;j<array.length;j++)
+                            {
+                                if(array[i]==array[j])
+                                {
+                                    count= count+1;
+                                }
+                            }
+                            alert(count + array[i]);
+                            if(count>1)
+                            {
+                                alert(array[i])
+                            }
+                        }*/
+                        
+                                              
+                    }
+                });
+                getBillNo();
+
+                getMaxFromBillList();
+            }
+            function getBillNo()
+            {
+                var ddb = createDBConnection();
+                var params = 
+                {
+                    TableName: 'sales',
+                    AttributesToGet:['billNo']
+                };
+
+                ddb.scan(params, function(err, data) 
+                {
+                    var max=0;
+                    if (err) 
+                    {
+                        alert("Unable to add item. Error JSON:", JSON.stringify(err, null, 2)); 
+                        return false;
+                    }
+                    else 
+                    {
+                        //var item = data.Item.name;
+                        var bill = document.getElementById("billNo");
+                        for(i=0;i<data.Count;i++)
+                        {
+                            if(max<data.Items[i].billNo.N)
+                            {
+                                max = data.Items[i].billNo.N;
+                            }
+                        }
+                    }
+                    max = parseInt(max) + 1;
+                    bill.value = (max);
+                });
+            }
+            function getMaxFromBillList()
+            {
+                var ddb = createDBConnection();
+                var params = 
+                {
+                    TableName: 'Bills',
+                    AttributesToGet:['Bid']
+                };
+
+                ddb.scan(params, function(err, data) 
+                {
+                    var max=0;
+                    if (err) 
+                    {
+                        alert("Unable to add item. Error JSON:", JSON.stringify(err, null, 2)); 
+                        return false;
+                    }
+                    else 
+                    {
+                        //var item = data.Item.name;
+                        var sizeDb = document.getElementById("BillDbSize");
+                        for(i=0;i<data.Count;i++)
+                        {
+                            if(max<data.Items[i].Bid.N)
+                            {
+                                max = data.Items[i].Bid.N;
+                            }
+                        }
+                    }
+                    max = parseInt(max) + 1;
+                    sizeDb.value = (max);
+                });
+            }
+            function saveToSales(selecteddata)
+            {
+                var ddb = createDBConnection();
+                for(i=1;i<selecteddata.length;i++)
+                {
+                    var docClient = new AWS.DynamoDB.DocumentClient();
+                    var table = "sales";
+                    var slno = parseInt(selecteddata[i].Id);
+                    var bID = parseInt(document.getElementById("billNo").value);
+                    var mName =selecteddata[i].Name;
+                    var mqty =parseInt(selecteddata[i].qty);
+                    var mAmount =parseInt(selecteddata[i].amount);
+                    var mDate =parseInt(document.getElementById("today").value);
+                    
+                    var params = {
+                        TableName:table,
+                        Item:{
+                            "slno": slno,
+                            "billNo": bID,
+                            "medName":mName,
+                            "noItems":mqty,
+                            "pDate":mDate,
+                            "price":mAmount
+                        }
+                    };
+
+                    console.log("Adding a new item...");
+                    docClient.put(params, function(err, data) {
+                        if (err) {
+                            console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
+                        } else {
+                            console.log("Added item:", JSON.stringify(data, null, 2));
+                        }
+                    });    
+                }
+            }
+            function saveToDb(selecteddata)
+            {
+                var ddb1 = createDBConnection();
+                    var docClient1 = new AWS.DynamoDB.DocumentClient();
+                    var table = "Bills";
+                    var id = parseInt(document.getElementById("BillDbSize").value);
+                    var bID = parseInt(document.getElementById("billNo").value);
+                    var total = parseInt(document.getElementById("amountTotal").value);
+                    var params1 = {
+                        TableName:table,
+                        Item:{
+                            "Bid": id,
+                            "billNo": bID,
+                            "totCost":total
+                        }
+                    };
+
+                    console.log("Adding a new item...");
+                    docClient1.put(params1, function(err, data) {
+                        if (err) {
+                            console.error("Unable to add item. Error JSON:", JSON.stringify(err, null, 2));
+                        } else {
+                            console.log("Added item:", JSON.stringify(data, null, 2));
+                        }
+                    });    
+                
+                
+            }
+            function uniq(origArr) 
+            {
+                var newArr = [],
+                    origLen = origArr.length,
+                    found, x, y;
+
+                for (x = 0; x < origLen; x++) {
+                    found = undefined;
+                    for (y = 0; y < newArr.length; y++) {
+                        if (origArr[x] === newArr[y]) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        newArr.push(origArr[x]);
+                    }
+                }
+                return newArr;
+            }
+            
+            
+        </script>
+        
+         
+         <style>
+             .ontop {
+                z-index: 999;
+                width: 100%;
+                height: 100%;
+                top: 0;
+                left: 0;
+                display: none;
+                position: absolute;             
+                color: #aaaaaa;
+            }
+            #popup {
+                width: 1500px;
+                height: 800px;
+                position: absolute;
+                color: #ffff;
+                /* To align popup window at the center of screen*/
+                top: 20%;
+                left: 20%;
+                margin-top: -100px;
+                margin-left: -150px;
+            }
+            .inputbx{
+                width: 100%;padding: 5px 10px;
+            }
+            .tableHead{
+                padding:5px;
+                text-align: center
+            }
+            .normal-font1{
+                padding:20px 10px;}/*
+            }/onClick="pop('popDiv')"*/
+            .input-style{
+                text-align:center;
+                padding: 5px;
+                width: 50%;
+            }
+            #formId{
+                margin-top: 30%;
+                background:#fff;
+                opacity: 0.9;
+                padding: 30px 20px;
+            }
+            #AddformId{
+                background:#fff;
+                opacity: 0.9;
+                padding: 30px 20px;
+            }
+            .heading{
+                font-size: 30px;
+                font-weight: 700;
+            }
+            .button-style{
+                background:none;
+                padding:5px 20px;
+
+                font-weight: 700;
+            }
+            .button-style:hover{
+                background:#0095FF;
+                color:#fff;
+                text-decoration:none!important;
+               
+            }
+            #selected{
+                padding:5px 20px;
+                color:#000;
+                width: 100%;
+            }
+            table {
+                font-family: arial, sans-serif;
+                border-collapse: collapse;
+                width: 100%;
+                }
+
+             td, th {
+                border: 1px solid #dddddd;
+                text-align: left;
+                padding: 8px;
+            }
+
+             tr:nth-child(even) {
+                background-color: #dddddd;
+            } 
+         </style>
+         
+  	</HEAD>
+	<BODY style="background-image:url('mov.jpg');background-size:cover;background-repeat:no-repeat">
+		<div id="popDiv" class="ontop" style="background-image:url('home.jpg');background-size:cover;background-repeat:no-repeat">
+            <a id="close" class="btn btn-danger" onClick="hide('popDiv')" style="float:right;margin-right:10%;margin-top:3%;">Close</a>
+			<div class="row text-center" onClick="popMovieCat('popDiv2')" >
+           	    <div class="container" style="margin-top:15%;background:#fff;padding:30px;cursor:pointer;color:#AC050C;width:400px">
+                    <h1>Medicine Stock</h1>
+		        </div>
+            </div>
+
+              
+            <div class="row text-center" onClick="popMovieSearch('popDiv3')" >
+                <div class="container" style="margin-top:1%;background:#fff;;padding:30px;cursor:pointer;color:#AC050C;width:400px">
+                    <h1>Medicine Sale</h1>
+                </div>
+            </div>
+		</div>
+        <div id="popDiv2" class="ontop" style="background-image:url('movsAll.jpg');background-size:cover;background-repeat:no-repeat">
+            <a id="close" class="btn btn-danger" onClick="hide('popDiv2')" style="float:right;margin-right:10%;margin-top:3%;">Close</a>
+            <h1 style="text-align:center;background:#fff;margin-top:5%;padding:30px;color:#AC050C">All Medicines</h1>
+                
+            <div class="container">
+                <div id="All" class="row text-center" style="">
+                
+                </div>
+            </div>
+            
+        </div>
+        <div id="popDiv3" class="ontop " style="background-image:url('search.jpg');background-size:cover;background-repeat:no-repeat">
+            <a id="close" class="btn btn-danger" onClick="hide('popDiv3')" style="float:right;margin-right:10%;margin-top:3%;">Close</a>
+            <h1 style="text-align:center;background:#fff;margin-top:5%;padding:30px;color:#AC050C">Medicine Sales</h1>
+             
+             <div class="row container" style="padding-bottom:40px;background:#fff;opacity:0.9;">
+                <div class="col-lg-12 " style="padding-top:20px;padding-bottom:20px;">
+                
+                    </br>
+                    <table >
+                        <tr>
+                            <td>Select An Item</td>
+                            <td><select id="selected" ></select></td>
+                            <td>Number of Item</td>
+                            <td><input id="itemQty" type="number" name="" value="1"></td>
+                            <td><button style="padding:5px 40px;" onclick="getDetails()">Add Item</button></td>
+                        </tr>
+                        <tr>
+                            <td>Bill Number</td>
+                            <td><input id="billNo" type="text" name="number" value="" disabled=""></td>
+                        
+                            <td>Date Of Sale:</td>
+                            <td><input id="today" type="date" name="sDate" disabled="true"></td>
+                            
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="container" style="margin-top:20px">
+                <table id="MedSelected" width="100%" align="center">
+                        <tr>
+                            <td></td>
+                            <td></td>
+
+                            <td></td>
+
+                            <td></td>
+
+                        </tr>
+                        
+                       
+                    
+                </table> 
+                <button style="padding:5px 40px;color:#000;margin-top:20px;" onclick="saveToDb()">Print</button> 
+                <span style="padding:5px 10px">Total Cost:</span> 
+                <input style="padding:5px 40px;color:#000" id="amountTotal" type="number" name="number" disabled> 
+
+                <input style="display:none" id="BillDbSize" type="number" name="number" disabled>   
+                </div>
+
+            </div>
+            
+        </div>
+		<CENTER>
+		<div class="row">
+			<div class="col-md-4"></div>
+			<div class="col-md-4">
+				<form name="frm" id="formId"> 
+    			<p class="heading">Login</p></br>
+        		<input id="username" class="input-style" type="text"  placeholder="username" value="admin"  required ></br></br>
+        		<input id="password" class="input-style" type="password" placeholder="password" value="admin"  required ></br></br>
+        		<a class="button-style" href="#" onClick="login()">Sign in</a></br></br>
+				<a style="text-decoration:none" href="#">Forgot Password</a>
+    		</form>
+			
+			</div>
+			<div class="col-md-4"></div>
+		</div>
+	   </CENTER>
+	</BODY>
+    <script>
+       
+        var d =new Date();
+        document.getElementById("today").valueAsDate= d;
+        function clearAll(){
+                document.getElementById("frm").reset();         }
+            function pop(div) {
+                document.getElementById(div).style.display = 'block';
+            }
+            function popMovieCat(div) {
+
+               document.getElementById(div).style.display = 'block';
+                
+               
+            }
+            function popMovieSearch(div) {
+                getMedineRecord();
+                
+                document.getElementById(div).style.display = 'block';
+            }
+            function hide(div) {
+                document.getElementById(div).style.display = 'none';
+            }
+            //To detect escape button
+            document.onkeydown = function(evt) {
+                evt = evt || window.event;
+                if (evt.keyCode == 27) {
+                    hide('popDiv');
+                }
+            };
+               
+    </script>
+</HTML>
